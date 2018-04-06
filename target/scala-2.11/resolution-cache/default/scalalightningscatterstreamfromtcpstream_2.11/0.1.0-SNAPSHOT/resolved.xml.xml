@@ -4,7 +4,7 @@
 		module="scalalightningscatterstreamfromtcpstream_2.11"
 		revision="0.1.0-SNAPSHOT"
 		status="integration"
-		publication="20180406105500"
+		publication="20180406235343"
 	>
 		<description>
 		scalalightningscatterstreamfromtcpstream

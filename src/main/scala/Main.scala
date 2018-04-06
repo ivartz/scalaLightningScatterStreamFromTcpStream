@@ -7,14 +7,15 @@ object Main {
         import org.viz.lightning._
         import scala.util.Random
 
+        val renderQueue = scala.collection.mutable.Queue[Array[Byte]]()
+
         def recvAll(is: InputStream, n: Int): Array[Byte] = {
             val data = ArrayBuffer[Byte]()
             while (data.length < n) {
                 val packet = Array.ofDim[Byte](n - data.length)
-                if (is.read(packet, 0, packet.length) == -1) {
-                    Array[Byte]()
-                }
-                data ++= packet   
+                if (! (is.read(packet, 0, packet.length) == -1)) {
+                    data ++= packet 
+                }   
             }
             data.toArray
         }
@@ -26,16 +27,13 @@ object Main {
             val msgLen = ByteBuffer.wrap(rawMsgLen).getInt
             recvAll(is, msgLen)
         }
-        def recvAndPlotFromServerSocket(server: ServerSocket, lgn: Lightning, viz: Visualization): Unit = {
+        def recvFromServerSocket(server: ServerSocket, lgn: Lightning, viz: Visualization): Unit = {
             var is = server.accept().getInputStream
             while (true) {
                 var rawMsg = recvMsg(is)
                 if (rawMsg.deep != Array[Byte]().deep) {
-                    val msgString = (rawMsg.map(_.toChar)).mkString
-                    val points = msgString.split(";").map(_.replaceAllLiterally("(","").replaceAllLiterally(")","").split(","))
-                    val x = points.map(_(0).toDouble)
-                    val y = points.map(_(1).toDouble)
-                    lgn.scatterStreaming(x=x, y=y, size=3, xaxis="Hz", yaxis="pV^2 / Hz", viz=viz)
+                   //println("pushing frame")
+                    renderQueue.enqueue(rawMsg)
                 }
                 else {
                     is = server.accept().getInputStream
@@ -43,7 +41,7 @@ object Main {
             }
         }
         val lgn = Lightning()
-        val sessionId = "77307eab-4e9e-4016-850d-97a1d1f4a12b"
+        val sessionId = "0ef98bd0-bde7-4f76-8679-fdf7fc98d206"
         lgn.useSession(sessionId)
         val Fs = 10000
         val startFreq = 296/8
@@ -56,7 +54,31 @@ object Main {
         val y = (Array.fill(1 + (Fs / 2) / 8)(Random.nextDouble() * 1e11)).slice(startFreq, endFreq+1)
         val viz = lgn.scatterStreaming(x=x, y=y, size=3, xaxis="Hz", yaxis="pV^2 / Hz")
         val server = new ServerSocket(54322)
+        val renderThread = new Thread(new Runnable {
+          def run() {
+            while (true) {
+                if (!renderQueue.isEmpty) {
+                    val rawMsg = renderQueue.dequeue
+                    val msgString = (rawMsg.map(_.toChar)).mkString
+                    val points = msgString.split(";").map(_.replaceAllLiterally("(","").replaceAllLiterally(")","").split(","))
+                    val x = points.map(_(0).toDouble)
+                    val y = points.map(_(1).toDouble)
+                    //println("plotting frame")
+                    lgn.scatterStreaming(x=x, y=y, size=3, xaxis="Hz", yaxis="pV^2 / Hz", viz=viz)
+                }
+                /*
+                if (renderQueue.length < 50) {
+                    Thread.sleep(49) // 50 - 5 ms
+                }
+                */
+                //Thread.sleep(50) // 2 * 25 ms since 40/2 Hz arrival
+                Thread.sleep(25)
+                println(s"plotting queue size (bytes): ${renderQueue.length}")
+            }
+          }
+        })
         println("now listening on port 54322")
-        recvAndPlotFromServerSocket(server, lgn, viz)
-    }
+        renderThread.start()
+        recvFromServerSocket(server, lgn, viz)
+    }   
 }

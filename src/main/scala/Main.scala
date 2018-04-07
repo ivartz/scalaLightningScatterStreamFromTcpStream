@@ -8,6 +8,7 @@ object Main {
         import scala.util.Random
 
         val renderQueue = scala.collection.mutable.Queue[Array[Byte]]()
+
         def recvAll(is: InputStream, n: Int): Array[Byte] = {
             val data = ArrayBuffer[Byte]()
                 while (data.length < n) {
@@ -29,18 +30,18 @@ object Main {
         def recvFromServerSocket(server: ServerSocket, lgn: Lightning, viz: Visualization): Unit = {
             var is = server.accept().getInputStream
             while (true) {
-	            var rawMsg = recvMsg(is)
-	            if (rawMsg.deep != Array[Byte]().deep) {
-	               //println("pushing frame")
-	                renderQueue.enqueue(rawMsg)
-	            }
-	            else {
-	                is = server.accept().getInputStream
-	            }
+	        var rawMsg = recvMsg(is)
+	        if (rawMsg.deep != Array[Byte]().deep) {
+	           //println("pushing frame")
+	            renderQueue.enqueue(rawMsg)
+	        }
+	        else {
+	            is = server.accept().getInputStream
+	        }
             }
         }
         val lgn = Lightning()
-        val sessionId = "0ef98bd0-bde7-4f76-8679-fdf7fc98d206"
+        val sessionId = "38741a99-5a22-4223-99a9-ca3793922763"
         lgn.useSession(sessionId)
         val Fs = 10000
         val startFreq = 296/8
@@ -62,14 +63,12 @@ object Main {
                         //println("plotting frame")
                         lgn.scatterStreaming(x=x, y=y, size=3, xaxis="Hz", yaxis="pV^2 / Hz", viz=viz)
                     }
-                    /*
-                    if (renderQueue.length < 50) {
-                        Thread.sleep(49) // 50 - 5 ms
-                    }
-                    */
-                    //Thread.sleep(50) // 2 * 25 ms since 40/2 Hz arrival
-                    Thread.sleep(25)
-                    println(s"plotting queue size (bytes): ${renderQueue.length}")
+                    //if (renderQueue.length < 50) {
+                    //    Thread.sleep(49) // 50 - 5 ms
+                    //}
+                    //println(s"plotting queue size (bytes): ${renderQueue.length}")
+                    //Thread.sleep(25) // 25 ms with 40 Hz arrival
+                    Thread.sleep(50) // 2 * 25 ms since 40/2 Hz arrival
                 }
             }
         })

@@ -8,21 +8,20 @@ object Main {
         import scala.util.Random
 
         val renderQueue = scala.collection.mutable.Queue[Array[Byte]]()
-
         def recvAll(is: InputStream, n: Int): Array[Byte] = {
             val data = ArrayBuffer[Byte]()
-            while (data.length < n) {
-                val packet = Array.ofDim[Byte](n - data.length)
-                if (! (is.read(packet, 0, packet.length) == -1)) {
-                    data ++= packet 
-                }   
+                while (data.length < n) {
+    	            val packet = Array.ofDim[Byte](n - data.length)
+	            if (! (is.read(packet, 0, packet.length) == -1)) {
+	                data ++= packet
+	            }   
             }
             data.toArray
         }
         def recvMsg(is: InputStream): Array[Byte] = {
             val rawMsgLen = recvAll(is, 4)
             if (rawMsgLen.deep == Array.ofDim[Byte](4).deep){
-                Array[Byte]()
+    	        Array[Byte]()
             }
             val msgLen = ByteBuffer.wrap(rawMsgLen).getInt
             recvAll(is, msgLen)
@@ -30,14 +29,14 @@ object Main {
         def recvFromServerSocket(server: ServerSocket, lgn: Lightning, viz: Visualization): Unit = {
             var is = server.accept().getInputStream
             while (true) {
-                var rawMsg = recvMsg(is)
-                if (rawMsg.deep != Array[Byte]().deep) {
-                   //println("pushing frame")
-                    renderQueue.enqueue(rawMsg)
-                }
-                else {
-                    is = server.accept().getInputStream
-                }
+	            var rawMsg = recvMsg(is)
+	            if (rawMsg.deep != Array[Byte]().deep) {
+	               //println("pushing frame")
+	                renderQueue.enqueue(rawMsg)
+	            }
+	            else {
+	                is = server.accept().getInputStream
+	            }
             }
         }
         val lgn = Lightning()
@@ -46,37 +45,35 @@ object Main {
         val Fs = 10000
         val startFreq = 296/8
         val endFreq = 3000/8
-        val x = ( Array.fill(1 + (Fs / 2) / 8)
-                 ( 296D + 
-                  Random.nextDouble() * 
-                  (3000D - 296D + 1D) ) )
-         .slice(startFreq, endFreq+1)
-        val y = (Array.fill(1 + (Fs / 2) / 8)(Random.nextDouble() * 1e11)).slice(startFreq, endFreq+1)
+        val x = ( Array.fill(1 + (Fs / 2) / 8)( 296D + Random.nextDouble() * (3000D - 296D + 1D) ) )
+            .slice(startFreq, endFreq+1)
+        val y = (Array.fill(1 + (Fs / 2) / 8)(Random.nextDouble() * 1e11))
+            .slice(startFreq, endFreq+1)
         val viz = lgn.scatterStreaming(x=x, y=y, size=3, xaxis="Hz", yaxis="pV^2 / Hz")
-        val server = new ServerSocket(54322)
         val renderThread = new Thread(new Runnable {
-          def run() {
-            while (true) {
-                if (!renderQueue.isEmpty) {
-                    val rawMsg = renderQueue.dequeue
-                    val msgString = (rawMsg.map(_.toChar)).mkString
-                    val points = msgString.split(";").map(_.replaceAllLiterally("(","").replaceAllLiterally(")","").split(","))
-                    val x = points.map(_(0).toDouble)
-                    val y = points.map(_(1).toDouble)
-                    //println("plotting frame")
-                    lgn.scatterStreaming(x=x, y=y, size=3, xaxis="Hz", yaxis="pV^2 / Hz", viz=viz)
+            def run() {
+                while (true) {
+                    if (!renderQueue.isEmpty) {
+                        val rawMsg = renderQueue.dequeue
+                        val msgString = (rawMsg.map(_.toChar)).mkString
+                        val points = msgString.split(";").map(_.replaceAllLiterally("(","").replaceAllLiterally(")","").split(","))
+                        val x = points.map(_(0).toDouble)
+                        val y = points.map(_(1).toDouble)
+                        //println("plotting frame")
+                        lgn.scatterStreaming(x=x, y=y, size=3, xaxis="Hz", yaxis="pV^2 / Hz", viz=viz)
+                    }
+                    /*
+                    if (renderQueue.length < 50) {
+                        Thread.sleep(49) // 50 - 5 ms
+                    }
+                    */
+                    //Thread.sleep(50) // 2 * 25 ms since 40/2 Hz arrival
+                    Thread.sleep(25)
+                    println(s"plotting queue size (bytes): ${renderQueue.length}")
                 }
-                /*
-                if (renderQueue.length < 50) {
-                    Thread.sleep(49) // 50 - 5 ms
-                }
-                */
-                //Thread.sleep(50) // 2 * 25 ms since 40/2 Hz arrival
-                Thread.sleep(25)
-                println(s"plotting queue size (bytes): ${renderQueue.length}")
             }
-          }
         })
+        val server = new ServerSocket(54322)
         println("now listening on port 54322")
         renderThread.start()
         recvFromServerSocket(server, lgn, viz)
